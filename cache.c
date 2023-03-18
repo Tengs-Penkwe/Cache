@@ -288,18 +288,21 @@ static cache_line_t *cache_set_add(cache_t *cache, cache_set_t *cache_set, uintp
  */
 uint64_t cache_read(cache_t *cache, uintptr_t address, func_t generate_random_number) {
   
-  int cache_index = cache->cache_index_mask & address;
-  uintptr_t tag = cache->tag_mask & address;
   size_t offset = cache->block_offset_mask & address;
-printf("%lx, %x, %lx, %zx\n", address, cache_index, tag, offset);
+  int index     = (cache->cache_index_mask & address) >> cache->cache_index_shift;
+  uintptr_t tag = (cache->tag_mask & address) >> cache->tag_shift;
+printf("%lx, %zx, %x, %zx\n", address, offset, index, tag);
+// print_cache(cache);
 
-  cache_line_t* line = cache_set_find_matching_line(cache, cache->sets + cache_index, tag);
+  cache->access_count ++;
+  cache_line_t* line = cache_set_find_matching_line(cache, cache->sets + index, tag);
   if (line != NULL) {
     return cache_line_retrieve_data(line, offset);
+  } else {
+    cache->miss_count ++;
+    cache_set_add(cache, cache->sets + index, address, tag, generate_random_number);
+    return *(uint64_t*)address;
   }
-
-  /* TO BE COMPLETED BY THE STUDENT */
-  return 0; // Added to remove warning; remove once function is implemented.
 }
 
 /*
