@@ -113,6 +113,8 @@ void cache_free(cache_t *cache) {
     free(cache->sets[i].lru_list);
   }
 
+  free(cache->sets);
+
   free(cache);
 }
 
