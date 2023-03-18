@@ -4,6 +4,15 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+/* 
+ * print all information of a cache
+ */
+static void print_cache(cache_t* cache) {
+  printf("num_sets: %zx, num_lines: %zx, line_size: %zx, associativity: %zx\n", cache->num_sets, cache->num_lines, cache->line_size, cache->associativity);
+  printf("block_offset_mask: %lx, cache_index_mask: %lx, cache_index_shift: %u, tag_mask: %lx, tag_shift: %u\n", cache->block_offset_mask, cache->cache_index_mask, cache->cache_index_shift, cache->tag_mask, cache->tag_shift);
+  printf("policies: %u, memory: %p, lines: %p, sets: %p, access_count: %u, miss_count: %u\n", cache->policies, cache->memory, cache->lines, cache->sets, cache->access_count, cache->miss_count);
+}
+
 /*
  * Initialize a new cache set with the given associativity and index of the first cache line.
  */
@@ -282,6 +291,7 @@ uint64_t cache_read(cache_t *cache, uintptr_t address, func_t generate_random_nu
   int cache_index = cache->cache_index_mask & address;
   uintptr_t tag = cache->tag_mask & address;
   size_t offset = cache->block_offset_mask & address;
+printf("%lx, %x, %lx, %zx\n", address, cache_index, tag, offset);
 
   cache_line_t* line = cache_set_find_matching_line(cache, cache->sets + cache_index, tag);
   if (line != NULL) {
