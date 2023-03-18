@@ -194,6 +194,7 @@ size_t choose_unmarked_cache_line(cache_t *cache, cache_set_t *cache_set, func_t
 
   cache_line_t* lines = cache_set->lines;
 
+  //unmark all if all were marked
   if (cache_set->num_marked == cache->associativity) {
     for(int i = 0; i < cache->associativity; i++) {
       lines[i].is_marked = false;
@@ -201,17 +202,25 @@ size_t choose_unmarked_cache_line(cache_t *cache, cache_set_t *cache_set, func_t
     }
   } 
 
-  int select = generate_random_number() % cache->associativity;
+  //if there is invalid cache, replace it
   for (int i = cache_set->first_index; i < cache->associativity; i++) {
-    if ( lines[i].is_marked == false && select == 0){
+    if (lines[i].is_valid == false) {
       return i;
     }
-    select --;
+  }
+
+  int select = generate_random_number() % (cache->associativity - cache_set->num_marked);
+  for (int i = cache_set->first_index; i < cache->associativity; i++) {
+    if (select == 0 && lines[i].is_marked == false) {
+      return i;
+    }
+    if (lines[i].is_marked == false) {
+      select --;
+    } 
   }
 
   //ALARM
   return 0;
-  
 }
    
 void printlru(cache_set_t *cache_set) {
@@ -230,34 +239,29 @@ cache_line_t *find_available_cache_line(cache_t *cache, cache_set_t *cache_set, 
 
   cache_line_t* lines = cache_set->lines;
 
-  if (cache->policies == CACHE_REPLACEMENTPOLICY_LRU) {
-    size_t index = 0;
-    for (int i =  (cache -> associativity ); i > (cache_set-> first_index); i--) {
-      index = cache_set->lru_list[i-1];
-      if (!lines[index].is_valid) {
-        cache_line_make_mru(cache, cache_set, index);
-        return lines + index;
+  switch (cache->policies) {
+    case CACHE_REPLACEMENTPOLICY_LRU : {
+      size_t index = 0;
+      for (int i =  (cache -> associativity ); i > (cache_set-> first_index); i--) {
+        index = cache_set->lru_list[i-1];
+        if (!lines[index].is_valid) {
+          cache_line_make_mru(cache, cache_set, index);
+          return lines + index;
+        }
       }
+      
+      index = cache_set->lru_list[0];
+      cache_line_make_mru(cache, cache_set, index);
+      return lines + index;
     }
-    
-    index = cache_set->lru_list[0];
-    cache_line_make_mru(cache, cache_set, index);
-    return lines + index;
-
-  } else if (cache->policies == CACHE_REPLACEMENTPOLICY_RANDOMIZED_MARKING) {
-    size_t index =  choose_unmarked_cache_line(cache, cache_set, generate_random_number);
-    lines[index].is_marked = true;
-    cache_set->num_marked ++;
-    return lines + index;
+    case CACHE_REPLACEMENTPOLICY_RANDOMIZED_MARKING: {
+      size_t index =  choose_unmarked_cache_line(cache, cache_set, generate_random_number);
+      lines[index].is_marked = true;
+      cache_set->num_marked ++;
+      return lines + index;
+    }
+    default: return NULL; // Added to remove warning; remove once function is implemented.
   }
-    /* TO BE COMPLETED BY THE STUDENT */
-    /* If the cache replacement policy is LRU, don't forget to call
-     * cache_line_make_mru(cache, cache_set, i) once you have selected the
-     * cache line to use. If the cache replacement is RANDOMIZED_MARKING 
-     * then don't forget to mark the line. To generate a random number in 
-     * the range [0, n), use "generate_random_number() % n".
-     */
-    return NULL; // Added to remove warning; remove once function is implemented.
 }
 
 /*
@@ -290,7 +294,6 @@ uint64_t cache_read(cache_t *cache, uintptr_t address, func_t generate_random_nu
   if (line != NULL) {
     return cache_line_retrieve_data(line, offset);
   }
-
 
   /* TO BE COMPLETED BY THE STUDENT */
   return 0; // Added to remove warning; remove once function is implemented.
