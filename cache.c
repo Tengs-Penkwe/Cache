@@ -223,13 +223,6 @@ size_t choose_unmarked_cache_line(cache_t *cache, cache_set_t *cache_set, func_t
   return 0;
 }
    
-void printlru(cache_set_t *cache_set) {
-    printf("lru");
-    for(int j = 0; j < 4; j++) {
-      printf("%zu", cache_set->lru_list[j]);
-    }
-    printf("\n");
-}
 /*
  * Function to find a cache line to use for new data. Uses either a
  * line not being used, or a suitable line to be replaced, based on
