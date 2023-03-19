@@ -4,6 +4,14 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+void print_cache_set(cache_set_t* set, size_t num_lines) {
+    printf("first_index: %zu, num_lines: %zu, num_marked: %zu\n", set->first_index, num_lines, set->num_marked);
+    for (size_t i = 0; i < num_lines; i++) {
+        printf("\t Line %zu: ", i);
+        printf("valid: %d, dirty: %d, marked: %d, tag: %lx, memory: %p\n", set->lines[i].is_valid, set->lines[i].is_dirty, set->lines[i].is_marked, set->lines[i].tag, set->lines[i].block);
+    }
+}
+
 /* 
  * print all information of a cache
  */
@@ -183,9 +191,9 @@ static void cache_line_make_mru(cache_t *cache, cache_set_t *cache_set, size_t l
  */
 cache_line_t *cache_set_find_matching_line(cache_t *cache, cache_set_t *cache_set, uintptr_t tag) {
 
-  cache_line_t* lines = cache_set->lines;
-  for (int i = cache_set->first_index; i < cache->associativity; i++) {
-    if ( cache_line_check_validity_and_tag(lines + i, tag)){
+  cache_line_t* lines = cache_set->lines + cache_set->first_index;
+  for (int i = 0; i < cache->associativity; i++) {
+    if (cache_line_check_validity_and_tag(lines + i, tag)){
       if (cache->policies == CACHE_REPLACEMENTPOLICY_LRU) {
         cache_line_make_mru(cache, cache_set, i);
       }
@@ -201,25 +209,25 @@ cache_line_t *cache_set_find_matching_line(cache_t *cache, cache_set_t *cache_se
  */
 size_t choose_unmarked_cache_line(cache_t *cache, cache_set_t *cache_set, func_t generate_random_number) {
 
-  cache_line_t* lines = cache_set->lines;
+  cache_line_t* lines = cache_set->lines + cache_set->first_index;
 
   //unmark all if all were marked
   if (cache_set->num_marked == cache->associativity) {
     for(int i = 0; i < cache->associativity; i++) {
       lines[i].is_marked = false;
-      cache_set->num_marked = 0;
     }
+    cache_set->num_marked = 0;
   } 
 
   //if there is invalid cache, replace it
-  for (int i = cache_set->first_index; i < cache->associativity; i++) {
+  for (int i = 0; i < cache->associativity; i++) {
     if (lines[i].is_valid == false) {
       return i;
     }
   }
 
   int select = generate_random_number() % (cache->associativity - cache_set->num_marked);
-  for (int i = cache_set->first_index; i < cache->associativity; i++) {
+  for (int i = 0; i < cache->associativity; i++) {
     if (select == 0 && lines[i].is_marked == false) {
       return i;
     }
@@ -227,6 +235,8 @@ size_t choose_unmarked_cache_line(cache_t *cache, cache_set_t *cache_set, func_t
       select --;
     } 
   }
+
+  printf("here");
 
   //ALARM
   return 0;
@@ -239,12 +249,12 @@ size_t choose_unmarked_cache_line(cache_t *cache, cache_set_t *cache_set, func_t
  */
 cache_line_t *find_available_cache_line(cache_t *cache, cache_set_t *cache_set, func_t generate_random_number) {
 
-  cache_line_t* lines = cache_set->lines;
+  cache_line_t* lines = cache_set->lines + cache_set->first_index;
 
   switch (cache->policies) {
     case CACHE_REPLACEMENTPOLICY_LRU : {
       size_t index = 0;
-      for (int i =  (cache -> associativity ); i > (cache_set-> first_index); i--) {
+      for (int i = (cache -> associativity); i > 0; i--) {
         index = cache_set->lru_list[i-1];
         if (!lines[index].is_valid) {
           cache_line_make_mru(cache, cache_set, index);
@@ -257,7 +267,7 @@ cache_line_t *find_available_cache_line(cache_t *cache, cache_set_t *cache_set, 
       return lines + index;
     }
     case CACHE_REPLACEMENTPOLICY_RANDOMIZED_MARKING: {
-      size_t index =  choose_unmarked_cache_line(cache, cache_set, generate_random_number);
+      size_t index = choose_unmarked_cache_line(cache, cache_set, generate_random_number);
       lines[index].is_marked = true;
       cache_set->num_marked ++;
       return lines + index;
@@ -291,8 +301,6 @@ uint64_t cache_read(cache_t *cache, uintptr_t address, func_t generate_random_nu
   size_t offset = cache->block_offset_mask & address;
   int index     = (cache->cache_index_mask & address) >> cache->cache_index_shift;
   uintptr_t tag = (cache->tag_mask & address) >> cache->tag_shift;
-printf("%lx, %zx, %x, %zx\n", address, offset, index, tag);
-// print_cache(cache);
 
   cache->access_count ++;
   cache_line_t* line = cache_set_find_matching_line(cache, cache->sets + index, tag);
